@@ -36,7 +36,7 @@ async def sync_events_for_guild(
     except discord.Forbidden:
         print(f"[{guild.name}] ❌ Forbidden when fetching existing events.")
         return 0, []
-    seen_urls = {ev.location for ev in existing_events if ev.location}
+    existing_map = {ev.location: ev for ev in existing_events if ev.location}
 
     created = 0
     created_events = []
@@ -84,29 +84,53 @@ async def sync_events_for_guild(
                         print(f"[{guild.name}] Tournament {t.get('id')} already started, skipping.")
                     continue
 
-                # Build URL and check for duplicates
-                url_tourney = f"https://lichess.org/tournament/{t['id']}"
-                if url_tourney in seen_urls:
-                    if verbose:
-                        print(f"[{guild.name}] Event {url_tourney} already exists, skipping.")
-                    continue
-
-                # Convert times
+                # Convert times (must happen before update logic)
                 start_time = datetime.fromtimestamp(starts_at / 1000, tz=timezone.utc)
                 finishes_at = t.get("finishesAt", starts_at + 60 * 60 * 1000)
                 end_time = datetime.fromtimestamp(finishes_at / 1000, tz=timezone.utc)
 
+                # Build URL and check for duplicates
+                url_tourney = f"https://lichess.org/tournament/{t['id']}"
+                name = t.get("fullName", f"Arena {t['id']}")
+                desc = (
+                    f"**Lichess Arena Tournament**\n"
+                    f"• {start_time:%Y-%m-%d %H:%M UTC} – {end_time:%H:%M UTC}\n"
+                    f"• {t.get('minutes')} min · +{t.get('clock', {}).get('increment', 0)}s\n\n"
+                    f"{url_tourney}"
+                )
+
+                # if already exists by URL, update its details
+                if ev := existing_map.get(url_tourney):
+                    if (
+                        ev.name != name
+                        or ev.start_time != start_time
+                        or ev.end_time != end_time
+                        or (ev.description or "") != desc
+                    ):
+                        try:
+                            await ev.edit(
+                                name=name,
+                                description=desc,
+                                start_time=start_time,
+                                end_time=end_time,
+                                entity_type=discord.EntityType.external,
+                                location=url_tourney,
+                                privacy_level=discord.PrivacyLevel.guild_only
+                            )
+                            await log_to_notification_channel(
+                                guild, SETTINGS, f"🔄 Updated event: {name} ({t['id']})"
+                            )
+                            if verbose:
+                                print(f"[{guild.name}] 🔄 Updated event {url_tourney}")
+                        except Exception as e:
+                            print(f"[{guild.name}] ⚠️ Error updating {url_tourney}: {e}")
+                    continue
+
                 # Create event
                 try:
                     await guild.create_scheduled_event(
-                        name=t.get("fullName", f"Arena {t['id']}"),
-                        description=(
-                            f"**Lichess Arena Tournament**\n"
-                            f"• {start_time.strftime('%Y-%m-%d %H:%M UTC')} – "
-                            f"{end_time.strftime('%H:%M UTC')}\n"
-                            f"• {t.get('minutes')} min · +{t.get('clock', {}).get('increment', 0)}s\n\n"
-                            f"{url_tourney}"
-                        ),
+                        name=name,
+                        description=desc,
                         start_time=start_time,
                         end_time=end_time,
                         entity_type=discord.EntityType.external,
@@ -115,7 +139,6 @@ async def sync_events_for_guild(
                     )
                     created += 1
                     created_events.append(url_tourney)
-                    seen_urls.add(url_tourney)
                     print(f"[{guild.name}] 📅 New event created: {t.get('fullName')} ({t['id']})")
                 except discord.Forbidden:
                     print(f"[{guild.name}] ❌ Forbidden when creating {url_tourney}")
