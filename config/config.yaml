@@ -2,7 +2,7 @@
 
 logging:
   # Global logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  level: ERROR
+  level: INFO
   # When set to true, enables DEBUG-level logging globally
   verbose: false
   # File handler settings
@@ -10,15 +10,15 @@ logging:
     # Pattern for daily error log filename (strftime directive)
     filename_pattern: "error_log_%Y_%m_%d.log"
     # Log level for file handler
-    level: ERROR
+    level: WARNING
   # Console handler settings
   console:
     # Log level for console output
-    level: INFO
+    level: WARNING
   # Discord logging channel settings
   discord:
     # Log level for messages sent to Discord channels
-    level: INFO
+    level: ERROR
     # Whether to post event notifications (create/update/delete)
     events: true
 
