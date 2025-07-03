@@ -118,6 +118,18 @@ Start the bot using the package entrypoint:
 python -m src.bot
 ```
 
+To start the bot as a background process:
+```bash
+./start.sh
+```
+
+The bot will run in the background and output logs to `data/log/bot_output.log`.
+
+To stop the bot:
+```bash
+./stop.sh
+```
+
 ### 6. Initial Setup in Discord
 
 After the bot is running and joined your server:
@@ -175,6 +187,80 @@ scheduler:
 - `logging.discord.events` controls whether event notifications (create/update/delete) are sent to Discord.
 - `scheduler.auto_sync` is the default for new guilds; individual guilds can override it with the `/auto_sync` command.
 - `scheduler.cron` follows standard cron syntax. For example, `0 3 * * *` runs daily at 3 AM.
+
+## Quick Setup
+
+For convenience, the repository includes scripts to automate the setup process and running the bot.
+
+### Linux/macOS
+
+#### Using the Setup Script
+
+```bash
+# Make the script executable
+chmod +x setup.sh
+
+# Run setup (production only)
+./setup.sh
+
+# OR run setup with development dependencies
+./setup.sh --with-dev
+```
+
+This script:
+1. Creates all necessary directories and config files
+2. Sets up a Python virtual environment
+3. Installs dependencies based on your choice
+
+#### Running the Bot
+
+To start the bot as a background process:
+```bash
+# Make script executable if you haven't already
+chmod +x start.sh
+
+# Start the bot
+./start.sh
+```
+
+The bot will run in the background and output logs to `data/log/bot_output.log`.
+
+To stop the bot:
+```bash
+# Make script executable if you haven't already
+chmod +x stop.sh
+
+# Stop the bot
+./stop.sh
+```
+
+### Windows
+
+#### Using the Setup Script
+
+Run the setup script from Command Prompt or PowerShell:
+```
+setup.bat
+```
+
+For development setup with testing capabilities:
+```
+setup.bat --with-dev
+```
+
+#### Running the Bot
+
+To start the bot in a visible console window:
+```
+start.bat
+```
+
+To start the bot in the background (no visible window):
+```
+start-background.bat
+```
+
+When running in the background, logs will be written to `data\log\bot_output.log`.
 
 ## Testing
 
