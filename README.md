@@ -30,42 +30,28 @@ git clone https://github.com/your-repo/lichess-events-discord-bot.git
 cd lichess-events-discord-bot
 ```
 
-### 2. Create Configuration Files
+### 2. Configure the Bot
 
-Create the necessary configuration directories and files:
+The repository comes with sensible default configuration files. You just need to add your Discord bot token:
 
 ```bash
-# Create config directory
-mkdir -p config
-
-# Create a sample .env file if it doesn't exist
-cat > config/.env.sample << 'EOL'
-# Discord Bot Token
-DISCORD_TOKEN=your_token_here
-EOL
-
-# Create your actual .env file with your bot token
+# Copy the sample .env file and add your Discord token
 cp config/.env.sample config/.env
 nano config/.env
+```
 
-# Create a basic config.yaml file
-cat > config/config.yaml << 'EOL'
-logging:
-  level: INFO
-  verbose: false
-  file:
-    filename_pattern: "error_log_%Y_%m_%d.log"
-    level: ERROR
-  console:
-    level: INFO
-  discord:
-    level: INFO
-    events: true
+In the .env file, add your Discord bot token:
+```
+DISCORD_TOKEN=your_token_here
+```
 
-scheduler:
-  auto_sync: true
-  cron: "0 3 * * *"
-EOL
+The default `config/config.yaml` file already contains sensible settings for:
+- Logging levels (console, file, and Discord)
+- Daily error log file pattern
+- Background sync schedule (daily at 3 AM)
+- Event notifications
+
+You can adjust these settings as needed for your server.
 ```
 
 ### 3. Setup the Python Environment
@@ -159,11 +145,12 @@ After setting up a logging channel with `/setup_logging_channel`, the bot will p
 
 ## Configuration
 
-A `config/config.yaml` file lets you control the bot's logging and scheduling behavior without touching code.
+The repository includes a pre-configured `config/config.yaml` file with sensible defaults. You can edit this file to customize the bot's behavior without changing any code.
 
 ```yaml
+# Default configuration
 logging:
-  level: INFO            # Global log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: ERROR           # Global log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
   verbose: false         # If true, enables DEBUG-level logging globally
   file:
     filename_pattern: "error_log_%Y_%m_%d.log"  # Daily error log filename pattern
@@ -179,14 +166,23 @@ scheduler:
   cron: "0 3 * * *"     # Cron schedule (crontab format) for running sync jobs
 ```
 
-- `logging.level` sets the overall verbosity of log messages.
-- `logging.verbose` toggles detailed debug output.
-- `logging.file.filename_pattern` and `logging.file.level` configure file-based error logging.
-- `logging.console.level` configures on-screen log output.
-- `logging.discord.level` sets the minimum level for logs sent to Discord channels.
-- `logging.discord.events` controls whether event notifications (create/update/delete) are sent to Discord.
-- `scheduler.auto_sync` is the default for new guilds; individual guilds can override it with the `/auto_sync` command.
-- `scheduler.cron` follows standard cron syntax. For example, `0 3 * * *` runs daily at 3 AM.
+Configuration options explained:
+
+- **Logging Settings**
+  - `logging.level`: Sets the overall verbosity of log messages (defaults to ERROR which is appropriate for production use)
+  - `logging.verbose`: When set to true, enables DEBUG-level logging globally (useful for troubleshooting)
+  - `logging.file.*`: Controls error logging to files in the data/log directory
+  - `logging.console.*`: Controls what appears in the terminal when running the bot
+  - `logging.discord.*`: Controls what gets sent to your configured Discord logging channel
+
+- **Scheduler Settings**
+  - `scheduler.auto_sync`: Default setting for new guilds (can be overridden per guild with `/auto_sync`)
+  - `scheduler.cron`: When to run scheduled syncs; uses standard cron syntax
+    - Default `0 3 * * *` runs daily at 3 AM
+    - Other examples:
+      - `*/30 * * * *` - Every 30 minutes
+      - `0 */2 * * *` - Every 2 hours
+      - `0 12,18 * * *` - At 12 PM and 6 PM daily
 
 ## Quick Setup
 
@@ -208,9 +204,10 @@ chmod +x setup.sh
 ```
 
 This script:
-1. Creates all necessary directories and config files
+1. Validates the existing configuration files or creates them if missing
 2. Sets up a Python virtual environment
 3. Installs dependencies based on your choice
+4. Prompts for your Discord bot token if not already configured
 
 #### Running the Bot
 
@@ -247,6 +244,8 @@ For development setup with testing capabilities:
 ```
 setup.bat --with-dev
 ```
+
+Just like the Linux/macOS script, this will set up your environment and prompt for any missing configuration.
 
 #### Running the Bot
 
