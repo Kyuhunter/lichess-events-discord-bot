@@ -81,20 +81,25 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
         if not targets:
             await interaction.followup.send("ℹ️ No teams registered.", ephemeral=True)
             return
-        total, all_events = 0, []
+        total_created, total_updated, all_events = 0, 0, []
         for slug in targets:
-            created, events = await sync_events_for_guild(
+            created, updated, events = await sync_events_for_guild(
                 interaction.guild, SETTINGS, bot, verbose=False, team_slug=slug
             )
-            total += created
+            total_created += created
+            total_updated += updated
             all_events.extend(events)
-        if total == 0:
-            await interaction.followup.send("ℹ️ No new events created.", ephemeral=True)
+        # Construct feedback message
+        if total_created == 0 and total_updated == 0:
+            await interaction.followup.send("ℹ️ No new or updated events.", ephemeral=True)
         else:
-            await interaction.followup.send(
-                f"✅ {total} new events created:\n" + "\n".join(all_events),
-                ephemeral=True
-            )
+            parts = []
+            if total_created:
+                parts.append(f"✅ {total_created} new events created")
+            if total_updated:
+                parts.append(f"🔄 {total_updated} events updated")
+            summary = ", ".join(parts) + ":\n" + "\n".join(all_events)
+            await interaction.followup.send(summary, ephemeral=True)
 
     @bot.tree.command(name="sync_verbose", description="Sync with detailed logging for teams")
     @discord.app_commands.describe(team="Optional specific team slug to sync")
@@ -114,53 +119,69 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
         if not targets:
             await interaction.followup.send("ℹ️ No teams registered.", ephemeral=True)
             return
-        total, all_events = 0, []
+        total_created, total_updated, all_events = 0, 0, []
         for slug in targets:
-            created, events = await sync_events_for_guild(
+            created, updated, events = await sync_events_for_guild(
                 interaction.guild, SETTINGS, bot, verbose=True, team_slug=slug
             )
-            total += created
+            total_created += created
+            total_updated += updated
             all_events.extend(events)
-        if total == 0:
-            await interaction.followup.send("ℹ️ No new events created.", ephemeral=True)
+        if total_created == 0 and total_updated == 0:
+            await interaction.followup.send("ℹ️ No new or updated events.", ephemeral=True)
         else:
-            await interaction.followup.send(
-                f"✅ {total} new events created:\n" + "\n".join(all_events),
-                ephemeral=True
-            )
+            parts = []
+            if total_created:
+                parts.append(f"✅ {total_created} new events created")
+            if total_updated:
+                parts.append(f"🔄 {total_updated} events updated")
+            summary = ", ".join(parts) + ":\n" + "\n".join(all_events)
+            await interaction.followup.send(summary, ephemeral=True)
 
     @bot.command(name="sync")
     @commands.has_permissions(administrator=True)
     async def sync_prefix(ctx: commands.Context):
         guild_id = str(ctx.guild.id)
         teams = SETTINGS.get(guild_id, {}).get("teams", [])
-        total, all_events = 0, []
+        total_created, total_updated, all_events = 0, 0, []
         for slug in teams:
-            created, events = await sync_events_for_guild(
+            created, updated, events = await sync_events_for_guild(
                 ctx.guild, SETTINGS, bot, verbose=False, team_slug=slug
             )
-            total += created
+            total_created += created
+            total_updated += updated
             all_events.extend(events)
-        if created == 0:
-            await ctx.send("ℹ️ No team registered or no new events created.")
+        if total_created == 0 and total_updated == 0:
+            await ctx.send("ℹ️ No new or updated events.")
         else:
-            event_list = "\n".join(all_events)
-            await ctx.send(f"✅ {total} new events created:\n{event_list}")
+            parts = []
+            if total_created:
+                parts.append(f"✅ {total_created} new events created")
+            if total_updated:
+                parts.append(f"🔄 {total_updated} events updated")
+            summary = ", ".join(parts) + ":\n" + "\n".join(all_events)
+            await ctx.send(summary)
 
     @bot.command(name="sync_verbose")
     @commands.has_permissions(administrator=True)
     async def sync_verbose_prefix(ctx: commands.Context):
         guild_id = str(ctx.guild.id)
         teams = SETTINGS.get(guild_id, {}).get("teams", [])
-        total, all_events = 0, []
+        total_created, total_updated, all_events = 0, 0, []
         for slug in teams:
-            created, events = await sync_events_for_guild(
+            created, updated, events = await sync_events_for_guild(
                 ctx.guild, SETTINGS, bot, verbose=True, team_slug=slug
             )
-            total += created
+            total_created += created
+            total_updated += updated
             all_events.extend(events)
-        if created == 0:
-            await ctx.send("ℹ️ No team registered or no new events created.")
+        if total_created == 0 and total_updated == 0:
+            await ctx.send("ℹ️ No new or updated events.")
         else:
-            event_list = "\n".join(all_events)
-            await ctx.send(f"✅ {total} new events created:\n{event_list}")
+            parts = []
+            if total_created:
+                parts.append(f"✅ {total_created} new events created")
+            if total_updated:
+                parts.append(f"🔄 {total_updated} events updated")
+            summary = ", ".join(parts) + ":\n" + "\n".join(all_events)
+            await ctx.send(summary)

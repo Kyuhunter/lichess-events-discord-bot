@@ -7,6 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from .commands import setup_commands
 from .tasks import start_background_tasks
+from .utils import ensure_file_handler, logger
 
 # Ensure config directory for .env
 CONFIG_DIR = "config"
@@ -17,23 +18,6 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 # Ensure runtime files go under data/ only
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
-import logging
-# Delay creating the log file until first error is logged
-LOG_DIR = os.path.join(DATA_DIR, "log")
-os.makedirs(LOG_DIR, exist_ok=True)
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-_file_handler = None
-
-def _ensure_file_handler():
-    global _file_handler
-    if _file_handler is None:
-        log_file = os.path.join(LOG_DIR, f"error_log_{datetime.now(timezone.utc):%Y_%m_%d}.log")
-        handler = logging.FileHandler(log_file)
-        handler.setLevel(logging.ERROR)
-        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-        logger.addHandler(handler)
-        _file_handler = handler
 
 # settings stored in data/
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
@@ -70,10 +54,10 @@ bot.run(DISCORD_TOKEN)
 # global error handlers - ensure file handler before logging
 @bot.event
 async def on_command_error(ctx, error):
-    _ensure_file_handler()
+    ensure_file_handler()
     logger.error(f"Error in command {ctx.command}: {error}", exc_info=error)
 
 @bot.event
 async def on_error(event_method, *args, **kwargs):
-    _ensure_file_handler()
+    ensure_file_handler()
     logger.error(f"Unhandled exception in event {event_method}", exc_info=True)

@@ -29,7 +29,7 @@ async def sync_events_for_guild(
     bot: commands.Bot,
     verbose: bool = False,
     team_slug: str | None = None,
-) -> Tuple[int, list[str]]:
+) -> Tuple[int, int, list[str]]:
     gid = str(guild.id)
     # Determine which teams to sync
     if team_slug:
@@ -39,10 +39,12 @@ async def sync_events_for_guild(
     if not slugs:
         if verbose:
             print(f"[{guild.name}] No teams registered, skipping.")
-        return 0, []
+        return 0, 0, []
 
     total_created = 0
-    total_events: list[str] = []
+    total_updated = 0
+    total_events: list[str] = []  # created event URLs
+    total_updated_events: list[str] = []  # updated event URLs
     for team in slugs:
         if verbose:
             print(f"[{guild.name}] Starting sync for team '{team}'")
@@ -128,6 +130,9 @@ async def sync_events_for_guild(
                                 await log_to_notification_channel(
                                     guild, SETTINGS, f"🔄 Updated event for {team}: {name} ({t['id']})"
                                 )
+                                # record update
+                                total_updated += 1
+                                total_updated_events.append(url_tourney)
                                 if verbose:
                                     print(f"[{guild.name}] 🔄 Updated event {url_tourney}")
                             except Exception as e:
@@ -156,14 +161,26 @@ async def sync_events_for_guild(
                         continue
         total_created += created
         total_events.extend(created_events)
-    # Summary logging
-    if total_created > 0:
-        await log_to_notification_channel(
-            guild, SETTINGS,
-            f"✅ Sync completed: {total_created} new events created for teams: {', '.join(slugs)}\n" + "\n".join(total_events)
+    # Notify separately for creations and updates
+    if total_created:
+        msg_created = (
+            f"✅ {total_created} new events created for teams: {', '.join(slugs)}:\n"
+            + "\n".join(total_events)
         )
+        await log_to_notification_channel(guild, SETTINGS, msg_created)
+    if total_updated:
+        msg_updated = (
+            f"🔄 {total_updated} events updated for teams: {', '.join(slugs)}:\n"
+            + "\n".join(total_updated_events)
+        )
+        await log_to_notification_channel(guild, SETTINGS, msg_updated)
     if verbose:
         print(f"[{guild.name}] Verbose sync finished: {total_created} new events.")
     else:
-        print(f"[{guild.name}] Sync finished: {total_created} new events.")
-    return total_created, total_events
+        msg = f"Sync finished: {total_created} new events"
+        if total_updated:
+            msg += f", {total_updated} updated events"
+        print(f"[{guild.name}] {msg}.")
+    # return separate counts for created and updated events, and all event URLs
+    combined_events = total_events + total_updated_events
+    return total_created, total_updated, combined_events
