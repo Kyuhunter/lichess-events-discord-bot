@@ -2,7 +2,7 @@ import os
 import json
 import discord
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from discord.ext import commands
 from dotenv import load_dotenv
 from .commands import setup_commands
@@ -17,17 +17,23 @@ DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
 # Ensure runtime files go under data/ only
 DATA_DIR = "data"
 os.makedirs(DATA_DIR, exist_ok=True)
-# set up error log directory and file
+import logging
+# Delay creating the log file until first error is logged
 LOG_DIR = os.path.join(DATA_DIR, "log")
 os.makedirs(LOG_DIR, exist_ok=True)
-log_file = os.path.join(LOG_DIR, f"error_log_{datetime.utcnow():%Y_%m_%d}.log")
-# configure root logger to file errors
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
-file_handler = logging.FileHandler(log_file)
-file_handler.setLevel(logging.ERROR)
-file_handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
-logger.addHandler(file_handler)
+_file_handler = None
+
+def _ensure_file_handler():
+    global _file_handler
+    if _file_handler is None:
+        log_file = os.path.join(LOG_DIR, f"error_log_{datetime.now(timezone.utc):%Y_%m_%d}.log")
+        handler = logging.FileHandler(log_file)
+        handler.setLevel(logging.ERROR)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+        _file_handler = handler
 
 # settings stored in data/
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
@@ -61,11 +67,13 @@ setup_commands(bot, SETTINGS, save_settings)
 # Run bot
 bot.run(DISCORD_TOKEN)
 
-# global error handlers
+# global error handlers - ensure file handler before logging
 @bot.event
 async def on_command_error(ctx, error):
+    _ensure_file_handler()
     logger.error(f"Error in command {ctx.command}: {error}", exc_info=error)
 
 @bot.event
 async def on_error(event_method, *args, **kwargs):
+    _ensure_file_handler()
     logger.error(f"Unhandled exception in event {event_method}", exc_info=True)
