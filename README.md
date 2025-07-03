@@ -8,6 +8,7 @@ This bot synchronizes Lichess arena tournaments with Discord events for register
 - Creates Discord events for upcoming tournaments.
 - Supports manual sync and verbose logging.
 - Slash commands and prefix-based commands for easy interaction.
+- Discord channel logging for bot activity and event notifications.
 
 ## Prerequisites
 
@@ -47,6 +48,23 @@ Start the bot using the package entrypoint:
 python -m src.bot
 ```
 
+## Discord Commands
+
+The bot offers several slash commands for managing teams and event synchronization:
+
+- `/setup_team <team>` - Register a Lichess team to track tournaments
+- `/remove_team <team>` - Remove a registered team and delete its events
+- `/list_teams` - Show all registered teams in the server
+- `/sync [team]` - Manually sync events for all teams or a specific team
+- `/sync_verbose [team]` - Sync with detailed logging output
+- `/auto_sync <enable>` - Enable or disable scheduled background sync
+- `/setup_logging_channel <channel>` - Set a channel to receive bot logs and event notifications
+
+After setting up a logging channel with `/setup_logging_channel`, the bot will post:
+- Log messages based on the configured log level
+- Notifications when events are created, updated, or deleted
+- Information about team registrations and removals
+
 ## Configuration
 
 A `config/config.yaml` file lets you control the bot's logging and scheduling behavior without touching code.
@@ -60,6 +78,9 @@ logging:
     level: ERROR         # Log level written to the file handler
   console:
     level: INFO          # Log level printed to the console
+  discord:
+    level: INFO          # Log level for messages sent to Discord channels
+    events: true         # Whether to post event notifications (create/update/delete)
 
 scheduler:
   auto_sync: true        # Enable or disable background sync (default true)
@@ -70,6 +91,8 @@ scheduler:
 - `logging.verbose` toggles detailed debug output.
 - `logging.file.filename_pattern` and `logging.file.level` configure file-based error logging.
 - `logging.console.level` configures on-screen log output.
+- `logging.discord.level` sets the minimum level for logs sent to Discord channels.
+- `logging.discord.events` controls whether event notifications (create/update/delete) are sent to Discord.
 - `scheduler.auto_sync` is the default for new guilds; individual guilds can override it with the `/auto_sync` command.
 - `scheduler.cron` follows standard cron syntax. For example, `0 3 * * *` runs daily at 3 AM.
 
@@ -83,6 +106,10 @@ The project includes a comprehensive test suite with >80% test coverage. Tests a
 - `tests/test_sync.py`, `tests/test_sync_flow.py`, `tests/test_sync_additional.py`, `tests/test_sync_extra.py`, `tests/test_sync_more.py`: Tests for Lichess tournament synchronization logic
 - `tests/test_tasks.py`: Tests for scheduled background tasks and error handling
 - `tests/test_utils.py`: Tests for configuration and logging utilities
+- `tests/test_discord_logging.py`: Tests for Discord logging handler
+- `tests/test_notification_log.py` & `tests/test_notification_simple.py`: Tests for event notifications
+- `tests/test_discord_events.py`: Tests for Discord event handlers
+- `tests/test_logging_channel_setup.py`: Tests for logging channel setup command
 - `tests/conftest.py`: Shared test fixtures and mocks
 
 ### Running Tests

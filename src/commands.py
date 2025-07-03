@@ -1,13 +1,28 @@
 import os
 import discord
 import aiohttp, json
+import sys
+from datetime import datetime, timezone
 from discord.ext import commands
 from .sync import sync_events_for_guild
 from .utils import ensure_file_handler, logger
 
+# For detecting if we're in a test environment
+try:
+    from unittest.mock import MagicMock
+except ImportError:
+    MagicMock = type(None)  # Fallback if not available
+
 
 def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
-    async def log_to_notification_channel(guild: discord.Guild, message: str):
+    async def log_to_notification_channel(guild: discord.Guild, message: str, event_type=None):
+        # Try to use the Discord handler if available
+        for handler in logger.handlers:
+            if hasattr(handler, 'log_event') and event_type:
+                handler.log_event(event_type, message)
+                return
+        
+        # Fallback to direct channel messaging
         gid = str(guild.id)
         chan_id = SETTINGS.get(gid, {}).get("notification_channel")
         if not chan_id:
@@ -36,7 +51,7 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
         teams.append(slug)
         save_settings()
         await interaction.response.send_message(f"✅ Team `{slug}` added.", ephemeral=True)
-        await log_to_notification_channel(interaction.guild, f"Team `{slug}` has been registered.")
+        await log_to_notification_channel(interaction.guild, f"Team `{slug}` has been registered.", "create")
 
     @bot.tree.command(name="remove_team", description="Remove a registered Lichess team")
     @discord.app_commands.describe(team="Registered team slug to remove")
@@ -82,7 +97,7 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                 f"🗑️ Team `{slug}` removed. Deleted {deleted} associated event(s).", ephemeral=True
             )
             await log_to_notification_channel(
-                interaction.guild, f"Team `{slug}` removed and {deleted} events deleted."
+                interaction.guild, f"Team `{slug}` removed and {deleted} events deleted.", "delete"
             )
         except Exception as e:
             # Log error to file and inform user
@@ -118,7 +133,7 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             f"🔄 Scheduled sync has been {status} for this server.", ephemeral=True
         )
         await log_to_notification_channel(
-            interaction.guild, f"Scheduled sync {status} by user {interaction.user}"
+            interaction.guild, f"Scheduled sync {status} by user {interaction.user}", "update"
         )
 
     @bot.tree.command(name="sync", description="Manual sync for teams")
@@ -243,3 +258,232 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                 parts.append(f"🔄 {total_updated} events updated")
             summary = ", ".join(parts) + ":\n" + "\n".join(all_events)
             await ctx.send(summary)
+
+    # Define a separate function for setup_logging_channel so tests don't break
+    async def _setup_logging_channel_implementation(interaction: discord.Interaction, channel):
+        gid = str(interaction.guild_id)
+        settings = SETTINGS.setdefault(gid, {})
+        
+        # Check for all required permissions
+        perms = channel.permissions_for(interaction.guild.me)
+        missing_perms = []
+        
+        # Essential permissions needed for logging
+        if not perms.view_channel:
+            missing_perms.append("View Channel")
+        if not perms.send_messages:
+            missing_perms.append("Send Messages")
+        if not perms.embed_links:
+            missing_perms.append("Embed Links")
+            
+        if missing_perms:
+            # Ensure error is logged to file
+            ensure_file_handler()
+            logger.error(f"Permission denied: Missing permissions {', '.join(missing_perms)} in channel {channel.name} ({channel.id}) in guild {interaction.guild.name} ({interaction.guild.id})")
+            
+            await interaction.response.send_message(
+                f"⚠️ I don't have the required permissions in {channel.mention}.\n" +
+                "**Missing permissions:**\n" +
+                "\n".join(f"- {p}" for p in missing_perms) +
+                "\n\nPlease grant these permissions and try again.",
+                ephemeral=True
+            )
+            return
+            
+        # Save the channel ID
+        settings["notification_channel"] = channel.id
+        save_settings()
+        
+        # Send confirmation
+        await interaction.response.send_message(
+            f"✅ Logging channel set to {channel.mention}.", 
+            ephemeral=True
+        )
+        
+        # Send a test message to the channel
+        try:
+            embed = discord.Embed(
+                title="Logging Channel Setup",
+                description="✅ This channel has been successfully set up as the logging channel for the Lichess Events bot.",
+                color=discord.Color.green()
+            )
+            embed.add_field(
+                name="What to expect",
+                value="You will receive:\n• Bot status messages\n• Event notifications (create/update/delete)\n• Error logs based on configured log level",
+                inline=False
+            )
+            embed.add_field(
+                name="Configuration",
+                value="You can adjust logging settings in `config/config.yaml`\nCurrent log level: `INFO`\nEvent notifications: `Enabled`",
+                inline=False
+            )
+            embed.set_footer(text=f"Setup by {interaction.user} • {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
+            
+            await channel.send(embed=embed)
+            logger.info(f"Logging channel set to {channel.name} ({channel.id}) in guild {interaction.guild.name} ({interaction.guild.id})")
+        except discord.Forbidden:
+            # Ensure error is logged to file
+            ensure_file_handler()
+            logger.error(f"Forbidden: Cannot send test message to channel {channel.name} ({channel.id}) in guild {interaction.guild.name} ({interaction.guild.id})")
+            
+            await interaction.followup.send(
+                "⚠️ Failed to send a test message. Please check permissions.", 
+                ephemeral=True
+            )
+        except Exception as e:
+            # Log any other errors that might occur
+            ensure_file_handler()
+            logger.error(f"Error sending test message to channel {channel.name} ({channel.id})", exc_info=e)
+            
+            await interaction.followup.send(
+                "⚠️ An error occurred when sending a test message.", 
+                ephemeral=True
+            )
+    
+    # Register the command - we'll use a better test detection method
+    is_test_env = 'pytest' in sys.modules or any('pytest' in arg for arg in sys.argv)
+    logger.info("Registering setup_logging_channel command")
+    
+    @bot.tree.command(name="setup_logging_channel", description="Set up a channel for bot logs and event notifications")
+    @discord.app_commands.describe(channel="Text channel to use for logging")
+    @discord.app_commands.checks.has_permissions(administrator=True)
+    async def setup_logging_channel(interaction: discord.Interaction, channel: discord.TextChannel):
+        logger.info(f"setup_logging_channel called by {interaction.user}")
+        await _setup_logging_channel_implementation(interaction, channel)
+
+    # Add debug command for checking registered commands
+    @bot.command(name="debug_commands")
+    @commands.has_permissions(administrator=True)
+    async def debug_commands(ctx: commands.Context):
+        """Debug command to list all registered slash commands"""
+        try:
+            # Get all commands from the bot's tree
+            app_commands = bot.tree.get_commands()
+            command_list = [f"/{cmd.name}" for cmd in app_commands]
+            
+            if command_list:
+                await ctx.send(f"📋 Registered slash commands:\n" + "\n".join(command_list))
+            else:
+                await ctx.send("⚠️ No slash commands are currently registered.")
+                
+            # Check if setup_logging_channel specifically exists
+            has_logging_cmd = any(cmd.name == "setup_logging_channel" for cmd in app_commands)
+            await ctx.send(f"setup_logging_channel registered: {'✅ Yes' if has_logging_cmd else '❌ No'}")
+            
+            # Try syncing the commands again
+            try:
+                synced = await bot.tree.sync()
+                await ctx.send(f"🔄 Re-synced {len(synced)} commands.")
+            except Exception as e:
+                await ctx.send(f"❌ Error syncing commands: {str(e)}")
+        except Exception as e:
+            await ctx.send(f"❌ Error retrieving commands: {str(e)}")
+
+    @bot.command(name="check_perms")
+    @commands.has_permissions(administrator=True)
+    async def check_channel_permissions(ctx: commands.Context, channel_id: int = None):
+        """Check bot permissions in the specified channel or current channel"""
+        channel = None
+        
+        if channel_id:
+            channel = ctx.guild.get_channel(channel_id)
+            if not channel:
+                await ctx.send(f"⚠️ Couldn't find channel with ID {channel_id}")
+                return
+        else:
+            channel = ctx.channel
+        
+        # Get bot's permissions in this channel
+        perms = channel.permissions_for(ctx.guild.me)
+        
+        # Format permissions as readable text
+        permission_list = []
+        for name, value in perms:
+            status = "✅" if value else "❌"
+            permission_list.append(f"{status} {name}")
+        
+        # Group into allowed and denied
+        allowed = [p for p in permission_list if p.startswith("✅")]
+        denied = [p for p in permission_list if p.startswith("❌")]
+        
+        # Send report
+        embed = discord.Embed(
+            title=f"Permissions in #{channel.name}",
+            description=f"Bot permissions in <#{channel.id}>",
+            color=discord.Color.blue()
+        )
+        
+        if allowed:
+            embed.add_field(name="✅ Allowed", value="\n".join(allowed[:20]), inline=False)
+            if len(allowed) > 20:
+                embed.add_field(name="✅ Allowed (cont.)", value="\n".join(allowed[20:]), inline=False)
+        
+        if denied:
+            embed.add_field(name="❌ Denied", value="\n".join(denied[:20]), inline=False)
+            if len(denied) > 20:
+                embed.add_field(name="❌ Denied (cont.)", value="\n".join(denied[20:]), inline=False)
+        
+        # Log to file too
+        ensure_file_handler()
+        logger.info(f"Permission check in channel {channel.name} ({channel.id})")
+        for perm in denied:
+            if "send_messages" in perm or "view_channel" in perm or "embed_links" in perm:
+                logger.warning(f"Critical permission missing: {perm}")
+        
+        await ctx.send(embed=embed)
+
+    @bot.tree.command(name="verify_logging_channel", description="Check if the current logging channel is set up correctly")
+    @discord.app_commands.checks.has_permissions(administrator=True)
+    async def verify_logging_channel(interaction: discord.Interaction):
+        """Verify that the logging channel is correctly set up and the bot has proper permissions"""
+        await interaction.response.defer(ephemeral=True)
+        gid = str(interaction.guild_id)
+        settings = SETTINGS.get(gid, {})
+        
+        # Check if a notification channel is set
+        channel_id = settings.get("notification_channel")
+        if not channel_id:
+            await interaction.followup.send("❌ No logging channel has been set up. Use `/setup_logging_channel` first.")
+            return
+            
+        # Get the channel
+        channel = interaction.guild.get_channel(channel_id)
+        if not channel:
+            ensure_file_handler()
+            logger.error(f"Logging channel {channel_id} not found in guild {interaction.guild.name} ({interaction.guild.id})")
+            await interaction.followup.send(f"❌ Configured channel (ID: {channel_id}) not found. It may have been deleted.")
+            return
+            
+        # Check permissions
+        perms = channel.permissions_for(interaction.guild.me)
+        missing_perms = []
+        
+        # Essential permissions
+        if not perms.view_channel:
+            missing_perms.append("View Channel")
+        if not perms.send_messages:
+            missing_perms.append("Send Messages")
+        if not perms.embed_links:
+            missing_perms.append("Embed Links")
+            
+        # Report results
+        if missing_perms:
+            # Log the issue
+            ensure_file_handler()
+            logger.error(f"Missing permissions in logging channel {channel.name} ({channel_id}): {', '.join(missing_perms)}")
+            
+            await interaction.followup.send(
+                f"⚠️ Missing required permissions in {channel.mention}:\n" +
+                "\n".join(f"- {p}" for p in missing_perms) +
+                "\n\nPlease update the channel permissions and try again."
+            )
+        else:
+            # Send a test message to the channel
+            try:
+                test_msg = await channel.send("🔄 Testing logging channel... This is a test message.")
+                await interaction.followup.send(f"✅ Logging channel {channel.mention} is properly configured!")
+                await test_msg.delete()  # Clean up the test message
+            except Exception as e:
+                ensure_file_handler()
+                logger.error(f"Error testing logging channel {channel.name} ({channel_id})", exc_info=e)
+                await interaction.followup.send(f"❌ Error testing channel: {str(e)}")

@@ -15,6 +15,12 @@ logging:
   console:
     # Log level for console output
     level: INFO
+  # Discord logging channel settings
+  discord:
+    # Log level for messages sent to Discord channels
+    level: INFO
+    # Whether to post event notifications (create/update/delete)
+    events: true
 
 scheduler:
    # Enable or disable automatic background sync per server

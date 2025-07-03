@@ -5,8 +5,18 @@ import discord
 from discord.ext import commands
 from datetime import datetime, timezone
 import json
+import logging
+from .utils import logger
 
-async def log_to_notification_channel(guild: discord.Guild, SETTINGS: dict, message: str):
+async def log_to_notification_channel(guild: discord.Guild, SETTINGS: dict, message: str, event_type=None):
+    # Try to use the Discord handler if available
+    discord_handler = None
+    for handler in logger.handlers:
+        if hasattr(handler, 'log_event') and event_type:
+            handler.log_event(event_type, message)
+            return
+    
+    # Fallback to direct channel messaging if no handler or not an event
     gid = str(guild.id)
     chan_id = SETTINGS.get(gid, {}).get("notification_channel")
     if not chan_id:
@@ -128,7 +138,7 @@ async def sync_events_for_guild(
                                     privacy_level=discord.PrivacyLevel.guild_only
                                 )
                                 await log_to_notification_channel(
-                                    guild, SETTINGS, f"🔄 Updated event for {team}: {name} ({t['id']})"
+                                    guild, SETTINGS, f"Updated event for {team}: {name} ({t['id']})", "update"
                                 )
                                 # record update
                                 total_updated += 1
@@ -164,16 +174,16 @@ async def sync_events_for_guild(
     # Notify separately for creations and updates
     if total_created:
         msg_created = (
-            f"✅ {total_created} new events created for teams: {', '.join(slugs)}:\n"
+            f"{total_created} new events created for teams: {', '.join(slugs)}:\n"
             + "\n".join(total_events)
         )
-        await log_to_notification_channel(guild, SETTINGS, msg_created)
+        await log_to_notification_channel(guild, SETTINGS, msg_created, "create")
     if total_updated:
         msg_updated = (
-            f"🔄 {total_updated} events updated for teams: {', '.join(slugs)}:\n"
+            f"{total_updated} events updated for teams: {', '.join(slugs)}:\n"
             + "\n".join(total_updated_events)
         )
-        await log_to_notification_channel(guild, SETTINGS, msg_updated)
+        await log_to_notification_channel(guild, SETTINGS, msg_updated, "update")
     if verbose:
         print(f"[{guild.name}] Verbose sync finished: {total_created} new events.")
     else:

@@ -7,7 +7,7 @@ from discord.ext import commands
 from dotenv import load_dotenv
 from .commands import setup_commands
 from .tasks import start_background_tasks
-from .utils import ensure_file_handler, logger
+from .utils import ensure_file_handler, logger, setup_discord_handler
 
 # Ensure config directory for .env
 CONFIG_DIR = "config"
@@ -41,8 +41,18 @@ def save_settings():
 
 @bot.event
 async def on_ready():
-    await bot.tree.sync()
+    # Sync command tree and log available commands
+    commands = await bot.tree.sync()
+    command_names = [cmd.name for cmd in commands]
     print(f"✅ Logged in as {bot.user} (ID: {bot.user.id})")
+    print(f"🔄 Synced {len(command_names)} commands: {', '.join(command_names)}")
+    logger.info(f"Bot ready with commands: {', '.join(command_names)}")
+    
+    # Set up Discord logging handler
+    discord_handler = setup_discord_handler(bot, SETTINGS)
+    logger.info("Discord logging handler initialized")
+    
+    # Start background tasks
     start_background_tasks(bot, SETTINGS)
 
 # Setup commands
