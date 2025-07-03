@@ -1,0 +1,17 @@
+# Configuration for Lichess Events Discord Bot
+
+logging:
+  # Global logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  level: INFO
+  # When set to true, enables DEBUG-level logging globally
+  verbose: false
+  # File handler settings
+  file:
+    # Pattern for daily error log filename (strftime directive)
+    filename_pattern: "error_log_%Y_%m_%d.log"
+    # Log level for file handler
+    level: ERROR
+  # Console handler settings
+  console:
+    # Log level for console output
+    level: INFO
