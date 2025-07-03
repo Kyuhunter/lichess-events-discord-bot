@@ -633,9 +633,3 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             await interaction.followup.send(
                 "⚠️ Error checking bot status. Please check logs.", ephemeral=True
             )
-
-    # Alias for backward compatibility
-    @bot.tree.command(name="status", description="Alias for /lichess_status")
-    async def status(interaction: discord.Interaction):
-        """Alias for lichess_status command."""
-        await lichess_status(interaction)
