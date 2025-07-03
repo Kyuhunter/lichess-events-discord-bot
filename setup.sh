@@ -29,15 +29,21 @@ if [ ! -f config/.env ]; then
     echo "Creating .env file from the provided sample..."
     if [ -f config/.env.sample ]; then
         cp config/.env.sample config/.env
+        # Secure the .env file permissions (read/write for owner only)
+        chmod 600 config/.env
         echo "Please edit config/.env to add your Discord bot token."
         echo "You can open it with a text editor or run: nano config/.env"
     else
         echo "Warning: config/.env.sample not found. Creating a minimal .env file..."
         echo "DISCORD_TOKEN=" > config/.env
+        # Secure the .env file permissions (read/write for owner only)
+        chmod 600 config/.env
         echo "Please add your Discord bot token to config/.env"
     fi
 else
     echo "Found existing config/.env file"
+    # Ensure proper permissions on existing .env file
+    chmod 600 config/.env
 fi
 
 if [ ! -f config/config.yaml ]; then

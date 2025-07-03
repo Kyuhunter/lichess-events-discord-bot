@@ -27,13 +27,24 @@ if not exist config\.env (
         copy config\.env.sample config\.env
         echo Please edit config\.env to add your Discord bot token.
         echo You can open it with Notepad or any text editor.
+        echo Setting secure file permissions for .env file...
+        :: Use icacls to set permissions (Windows equivalent of chmod)
+        icacls config\.env /inheritance:r /grant:r "%USERNAME%:F" > nul 2>&1
+        if !ERRORLEVEL! NEQ 0 (
+            echo Warning: Failed to set secure permissions on config\.env file.
+            echo Please restrict access to this file manually.
+        )
     ) else (
         echo Warning: config\.env.sample not found. Creating a minimal .env file...
         echo DISCORD_TOKEN= > config\.env
         echo Please add your Discord bot token to config\.env
+        :: Secure permissions
+        icacls config\.env /inheritance:r /grant:r "%USERNAME%:F" > nul 2>&1
     )
 ) else (
     echo Found existing config\.env file
+    :: Secure existing .env file
+    icacls config\.env /inheritance:r /grant:r "%USERNAME%:F" > nul 2>&1
 )
 
 if not exist config\config.yaml (

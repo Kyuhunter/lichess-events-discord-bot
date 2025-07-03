@@ -9,11 +9,15 @@ import logging
 from .utils import logger
 
 async def log_to_notification_channel(guild: discord.Guild, SETTINGS: dict, message: str, event_type=None):
+    # Sanitize message for security
+    from .utils import sanitize_message
+    safe_message = sanitize_message(message)
+    
     # Try to use the Discord handler if available
     discord_handler = None
     for handler in logger.handlers:
         if hasattr(handler, 'log_event') and event_type:
-            handler.log_event(event_type, message)
+            handler.log_event(event_type, safe_message)
             return
     
     # Fallback to direct channel messaging if no handler or not an event

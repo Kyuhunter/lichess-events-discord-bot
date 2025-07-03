@@ -28,6 +28,9 @@ intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 
+# Track launch time for status command
+bot.launch_time = datetime.now(timezone.utc).timestamp()
+
 # Load settings
 if os.path.isfile(SETTINGS_FILE):
     with open(SETTINGS_FILE, "r") as f:

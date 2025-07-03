@@ -1,6 +1,7 @@
 import os
 import yaml
 import logging
+import re  # Added for regex validation
 from datetime import datetime, timezone
 import asyncio
 
@@ -199,3 +200,67 @@ def reload_console_handler():
     ch.setLevel(_console_level)
     ch.setFormatter(_logging_module.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
     logger.addHandler(ch)
+
+# Security validation functions
+def validate_team_slug(slug):
+    """
+    Validate a team slug against known safe patterns.
+    Returns sanitized slug if valid, None if invalid.
+    """
+    if not isinstance(slug, str):
+        return None
+        
+    # Strip whitespace
+    slug = slug.strip()
+    
+    # Check for valid characters (alphanumeric, hyphens, underscores)
+    if not re.match(r'^[a-zA-Z0-9_-]+$', slug):
+        return None
+        
+    # Enforce length limits (adjust as needed for Lichess requirements)
+    if not 1 <= len(slug) <= 30:
+        return None
+        
+    return slug
+
+def validate_discord_id(id_value):
+    """
+    Validate that a value is a valid Discord ID (numeric snowflake).
+    Returns the ID as a string if valid, None if invalid.
+    """
+    if isinstance(id_value, int):
+        # Convert to string for consistency
+        id_value = str(id_value)
+    
+    if not isinstance(id_value, str):
+        return None
+        
+    # Check that it's a numeric string
+    if not id_value.isdigit():
+        return None
+        
+    # Check reasonable length for Discord IDs
+    if not 17 <= len(id_value) <= 20:
+        return None
+        
+    return id_value
+
+def sanitize_message(message):
+    """
+    Sanitize a message for safe display.
+    Preserves some safe markdown but prevents injection attacks.
+    """
+    if not isinstance(message, str):
+        return ""
+        
+    # Escape backticks to prevent code injection
+    sanitized = message.replace('`', '\\`')
+    
+    # Escape Discord's mention syntax to prevent mentions
+    sanitized = sanitized.replace('@', '@\u200B')  # Zero-width space after @
+    
+    # Escape Discord's URL embedding
+    sanitized = re.sub(r'(https?://\S+)', r'<\1>', sanitized)
+    
+    # Limit to reasonable length
+    return sanitized[:1000]  # Limit to 1000 chars
