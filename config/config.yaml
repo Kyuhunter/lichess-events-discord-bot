@@ -18,6 +18,6 @@ logging:
 
 scheduler:
    # Enable or disable automatic background sync per server
-   auto_sync: false
+   auto_sync: true
    # Cron expression for scheduled sync (crontab format)
    cron: "0 3 * * *"
