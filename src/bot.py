@@ -19,7 +19,8 @@ os.makedirs(DATA_DIR, exist_ok=True)
 SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 intents = discord.Intents.default()
-intents.message_content = False  # Disable privileged intent if not needed
+# Enable privileged intent for message content so commands function correctly
+intents.message_content = True
 
 bot = commands.Bot(command_prefix="!", intents=intents)
 

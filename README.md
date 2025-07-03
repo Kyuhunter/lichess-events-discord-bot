@@ -13,6 +13,7 @@ This bot synchronizes Lichess arena tournaments with Discord events for register
 
 - Python 3.8 or higher
 - A Discord bot token
+- Enable the **Message Content Intent** under Privileged Gateway Intents in your Discord Developer Portal
 - A Lichess team slug
 - `pip` for installing dependencies
 
