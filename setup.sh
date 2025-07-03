@@ -17,51 +17,36 @@ if ! command -v python3 &> /dev/null; then
     exit 1
 fi
 
-# Create configuration directories
-echo "Creating configuration directories..."
-mkdir -p config
+# Ensure required directories exist
+echo "Ensuring required directories exist..."
 mkdir -p data
 mkdir -p data/log
 
-# Create sample .env file if it doesn't exist
-if [ ! -f config/.env.sample ]; then
-    echo "Creating sample .env file..."
-    cat > config/.env.sample << 'EOL'
-# Discord Bot Token
-DISCORD_TOKEN=your_token_here
-EOL
-    echo "Sample .env file created at config/.env.sample"
-fi
+# Check if configuration files exist
+echo "Checking configuration files..."
 
-# Create .env file if it doesn't exist
 if [ ! -f config/.env ]; then
-    echo "Creating .env file..."
-    cp config/.env.sample config/.env
-    echo "Please edit config/.env to add your Discord bot token."
-    echo "You can open it with a text editor or run: nano config/.env"
+    echo "Creating .env file from the provided sample..."
+    if [ -f config/.env.sample ]; then
+        cp config/.env.sample config/.env
+        echo "Please edit config/.env to add your Discord bot token."
+        echo "You can open it with a text editor or run: nano config/.env"
+    else
+        echo "Warning: config/.env.sample not found. Creating a minimal .env file..."
+        echo "DISCORD_TOKEN=" > config/.env
+        echo "Please add your Discord bot token to config/.env"
+    fi
+else
+    echo "Found existing config/.env file"
 fi
 
-# Create config.yaml file if it doesn't exist
 if [ ! -f config/config.yaml ]; then
-    echo "Creating config.yaml file..."
-    cat > config/config.yaml << 'EOL'
-logging:
-  level: INFO
-  verbose: false
-  file:
-    filename_pattern: "error_log_%Y_%m_%d.log"
-    level: ERROR
-  console:
-    level: INFO
-  discord:
-    level: INFO
-    events: true
-
-scheduler:
-  auto_sync: true
-  cron: "0 3 * * *"
-EOL
-    echo "Default config.yaml created at config/config.yaml"
+    echo "Warning: config/config.yaml not found!"
+    echo "The bot requires this file to run properly."
+    echo "Please restore it from the repository or see the README for configuration details."
+    exit 1
+else
+    echo "Found existing config/config.yaml file"
 fi
 
 # Create virtual environment

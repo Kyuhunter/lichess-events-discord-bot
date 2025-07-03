@@ -13,47 +13,36 @@ if %ERRORLEVEL% NEQ 0 (
     exit /b 1
 )
 
-:: Create configuration directories
-echo Creating configuration directories...
-if not exist config mkdir config
+:: Ensure required directories exist
+echo Ensuring required directories exist...
 if not exist data mkdir data
 if not exist data\log mkdir data\log
 
-:: Create sample .env file if it doesn't exist
-if not exist config\.env.sample (
-    echo Creating sample .env file...
-    echo # Discord Bot Token > config\.env.sample
-    echo DISCORD_TOKEN=your_token_here >> config\.env.sample
-    echo Sample .env file created at config\.env.sample
-)
+:: Check if configuration files exist
+echo Checking configuration files...
 
-:: Create .env file if it doesn't exist
 if not exist config\.env (
-    echo Creating .env file...
-    copy config\.env.sample config\.env
-    echo Please edit config\.env to add your Discord bot token.
-    echo You can open it with Notepad or any text editor.
+    echo Creating .env file from the provided sample...
+    if exist config\.env.sample (
+        copy config\.env.sample config\.env
+        echo Please edit config\.env to add your Discord bot token.
+        echo You can open it with Notepad or any text editor.
+    ) else (
+        echo Warning: config\.env.sample not found. Creating a minimal .env file...
+        echo DISCORD_TOKEN= > config\.env
+        echo Please add your Discord bot token to config\.env
+    )
+) else (
+    echo Found existing config\.env file
 )
 
-:: Create config.yaml file if it doesn't exist
 if not exist config\config.yaml (
-    echo Creating config.yaml file...
-    echo logging: > config\config.yaml
-    echo   level: INFO >> config\config.yaml
-    echo   verbose: false >> config\config.yaml
-    echo   file: >> config\config.yaml
-    echo     filename_pattern: "error_log_%%Y_%%m_%%d.log" >> config\config.yaml
-    echo     level: ERROR >> config\config.yaml
-    echo   console: >> config\config.yaml
-    echo     level: INFO >> config\config.yaml
-    echo   discord: >> config\config.yaml
-    echo     level: INFO >> config\config.yaml
-    echo     events: true >> config\config.yaml
-    echo. >> config\config.yaml
-    echo scheduler: >> config\config.yaml
-    echo   auto_sync: true >> config\config.yaml
-    echo   cron: "0 3 * * *" >> config\config.yaml
-    echo Default config.yaml created at config\config.yaml
+    echo Warning: config\config.yaml not found!
+    echo The bot requires this file to run properly.
+    echo Please restore it from the repository or see the README for configuration details.
+    exit /b 1
+) else (
+    echo Found existing config\config.yaml file
 )
 
 :: Create virtual environment
