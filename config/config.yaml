@@ -15,3 +15,9 @@ logging:
   console:
     # Log level for console output
     level: INFO
+
+scheduler:
+   # Enable or disable automatic background sync per server
+   auto_sync: false
+   # Cron expression for scheduled sync (crontab format)
+   cron: "0 3 * * *"

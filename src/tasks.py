@@ -1,20 +1,42 @@
 import os
-from discord.ext import tasks
+import yaml
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
 from .sync import sync_events_for_guild
 from .utils import ensure_file_handler, logger
 
 
 def start_background_tasks(bot, SETTINGS):
-    @tasks.loop(seconds=int(os.getenv("CHECK_INTERVAL", 300)))
-    async def check_tournaments():
+    """
+    Schedule periodic sync jobs based on cron settings from config/config.yaml.
+    """
+    # Load scheduler settings
+    cfg_path = os.path.join(os.getcwd(), "config", "config.yaml")
+    try:
+        with open(cfg_path) as f:
+            conf = yaml.safe_load(f)
+    except Exception as e:
+        logger.error(f"Failed to load scheduler config: {e}")
+        conf = {}
+
+    sched_conf = conf.get("scheduler", {})
+    cron_expr = sched_conf.get("cron", "*/5 * * * *")
+    default_auto = sched_conf.get("auto_sync", True)
+
+    scheduler = AsyncIOScheduler()
+    trigger = CronTrigger.from_crontab(cron_expr)
+
+    async def sync_job():
         for guild in bot.guilds:
+            gid = str(guild.id)
+            auto = SETTINGS.get(gid, {}).get("auto_sync", default_auto)
+            if not auto:
+                continue
             try:
-                # sync_events_for_guild now returns (created, updated, events)
-                created, updated, events = await sync_events_for_guild(guild, SETTINGS, bot, verbose=False)
+                await sync_events_for_guild(guild, SETTINGS, bot, verbose=False)
             except Exception as e:
-                # ensure file handler is attached before logging
                 ensure_file_handler()
                 logger.error(f"Error syncing tournaments for guild {guild.id}", exc_info=e)
-            # notification logging (created/updated) is done inside sync_events_for_guild
 
-    check_tournaments.start()
+    scheduler.add_job(sync_job, trigger)
+    scheduler.start()

@@ -39,16 +39,52 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
     @bot.tree.command(name="remove_team", description="Remove a registered Lichess team")
     @discord.app_commands.describe(team="Registered team slug to remove")
     async def remove_team(interaction: discord.Interaction, team: str):
+        # Defer response to allow time for deleting events
+        await interaction.response.defer(ephemeral=True)
+
         gid = str(interaction.guild_id)
         teams = SETTINGS.get(gid, {}).get("teams", [])
         slug = team.strip()
         if slug in teams:
             teams.remove(slug)
             save_settings()
-            await interaction.response.send_message(f"🗑️ Team `{slug}` removed.", ephemeral=True)
-            await log_to_notification_channel(interaction.guild, f"Team `{slug}` has been removed.")
+            # Identify and delete only this team's upcoming tournament events
+            deleted = 0
+            import aiohttp, json
+            async with aiohttp.ClientSession() as session:
+                url = f"https://lichess.org/api/team/{slug}/arena"
+                async with session.get(url) as resp:
+                    if resp.status == 200:
+                        # collect tournament IDs
+                        tourney_ids = []
+                        async for line in resp.content:
+                            try:
+                                t = json.loads(line.decode().strip())
+                                tourney_ids.append(t.get('id'))
+                            except Exception:
+                                continue
+                        urls_to_delete = {f"https://lichess.org/tournament/{tid}" for tid in tourney_ids}
+                        # fetch and delete matching events
+                        existing = await interaction.guild.fetch_scheduled_events()
+                        for ev in existing:
+                            if ev.location in urls_to_delete:
+                                try:
+                                    await ev.delete()
+                                    deleted += 1
+                                except Exception:
+                                    pass
+            # Send deletion summary
+            await interaction.followup.send(
+                f"🗑️ Team `{slug}` removed. Deleted {deleted} associated event(s).", ephemeral=True
+            )
+            await log_to_notification_channel(
+                interaction.guild, f"Team `{slug}` removed and {deleted} events deleted."
+            )
         else:
-            await interaction.response.send_message(f"⚠️ Team `{slug}` is not registered.", ephemeral=True)
+            # Immediate followup for non-registered slug
+            await interaction.response.send_message(
+                f"⚠️ Team `{slug}` is not registered.", ephemeral=True
+            )
 
     @bot.tree.command(name="list_teams", description="List registered Lichess teams in this guild")
     @discord.app_commands.checks.has_permissions(administrator=True)
@@ -62,6 +98,22 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                 "📋 Registered teams:\n" + "\n".join(f"- {t}" for t in teams),
                 ephemeral=True
             )
+
+    @bot.tree.command(name="auto_sync", description="Enable or disable scheduled background sync")
+    @discord.app_commands.describe(enable="True to enable, False to disable automatic sync")
+    @discord.app_commands.checks.has_permissions(administrator=True)
+    async def auto_sync_cmd(interaction: discord.Interaction, enable: bool):
+        gid = str(interaction.guild_id)
+        settings = SETTINGS.setdefault(gid, {})
+        settings["auto_sync"] = enable
+        save_settings()
+        status = "enabled" if enable else "disabled"
+        await interaction.response.send_message(
+            f"🔄 Scheduled sync has been {status} for this server.", ephemeral=True
+        )
+        await log_to_notification_channel(
+            interaction.guild, f"Scheduled sync {status} by user {interaction.user}"
+        )
 
     @bot.tree.command(name="sync", description="Manual sync for teams")
     @discord.app_commands.describe(team="Optional specific team slug to sync")
