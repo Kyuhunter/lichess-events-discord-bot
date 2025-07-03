@@ -128,36 +128,62 @@ async def test_remove_team_deletes_events(monkeypatch, bot, interaction, setting
 # Tests for notification channel logging
 @pytest.mark.asyncio
 async def test_setup_team_logs_to_channel(bot, interaction, settings, save_settings, monkeypatch):
-    # Monkeypatch TextChannel type check to accept MagicMock
-    import discord
-    monkeypatch.setattr(discord, 'TextChannel', MagicMock)
-    # Prepare a notification channel
-    channel = MagicMock()
-    channel.send = AsyncMock()
-    perms = MagicMock(send_messages=True)
-    channel.permissions_for.return_value = perms
-    interaction.guild.get_channel.return_value = channel
-    # Prepare settings
-    settings[str(interaction.guild_id)] = {'notification_channel': 99, 'teams': []}
+    # Setup commands first - important to do this before monkeypatching
     setup_commands(bot, settings, save_settings)
-    cmd = bot.tree.get_command('setup_team')
-    await cmd.callback(interaction, team='chanteam')
-    channel.send.assert_awaited_with('Team `chanteam` has been registered.')
+    
+    # Now monkeypatch TextChannel for the test
+    import discord
+    original_TextChannel = discord.TextChannel
+    monkeypatch.setattr(discord, 'TextChannel', MagicMock)
+    
+    try:
+        # Prepare a notification channel
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        perms = MagicMock(send_messages=True)
+        channel.permissions_for.return_value = perms
+        interaction.guild.get_channel.return_value = channel
+        
+        # Prepare settings
+        settings[str(interaction.guild_id)] = {'notification_channel': 99, 'teams': []}
+        
+        # Execute the command
+        cmd = bot.tree.get_command('setup_team')
+        await cmd.callback(interaction, team='chanteam')
+        
+        # Assert notification was sent
+        channel.send.assert_awaited_with('Team `chanteam` has been registered.')
+    finally:
+        # Restore the original TextChannel class
+        monkeypatch.setattr(discord, 'TextChannel', original_TextChannel)
 
 @pytest.mark.asyncio
 async def test_auto_sync_logs_to_channel(bot, interaction, settings, save_settings, monkeypatch):
-    # Prepare a notification channel
-    channel = MagicMock()
-    channel.send = AsyncMock()
-    # Monkeypatch TextChannel to recognize MagicMock channel
-    import discord
-    monkeypatch.setattr(discord, 'TextChannel', MagicMock)
-    perms = MagicMock(send_messages=True)
-    channel.permissions_for.return_value = perms
-    interaction.guild.get_channel.return_value = channel
-    # Prepare settings
-    settings[str(interaction.guild_id)] = {'notification_channel': 123}
+    # Setup commands first - important to do this before monkeypatching
     setup_commands(bot, settings, save_settings)
-    cmd = bot.tree.get_command('auto_sync')
-    await cmd.callback(interaction, enable=False)
-    channel.send.assert_awaited_with(f'Scheduled sync disabled by user {interaction.user}')
+    
+    # Now monkeypatch TextChannel for the test
+    import discord
+    original_TextChannel = discord.TextChannel
+    monkeypatch.setattr(discord, 'TextChannel', MagicMock)
+    
+    try:
+        # Prepare a notification channel
+        channel = MagicMock()
+        channel.send = AsyncMock()
+        perms = MagicMock(send_messages=True)
+        channel.permissions_for.return_value = perms
+        interaction.guild.get_channel.return_value = channel
+        
+        # Prepare settings
+        settings[str(interaction.guild_id)] = {'notification_channel': 123}
+        
+        # Execute the command
+        cmd = bot.tree.get_command('auto_sync')
+        await cmd.callback(interaction, enable=False)
+        
+        # Assert notification was sent
+        channel.send.assert_awaited_with(f'Scheduled sync disabled by user {interaction.user}')
+    finally:
+        # Restore the original TextChannel class
+        monkeypatch.setattr(discord, 'TextChannel', original_TextChannel)
