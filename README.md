@@ -137,7 +137,7 @@ The bot offers several slash commands for managing teams and event synchronizati
 - `/sync_verbose [team]` - Sync with detailed logging output
 - `/auto_sync <enable>` - Enable or disable scheduled background sync
 - `/setup_logging_channel <channel>` - Set a channel to receive bot logs and event notifications
-- `/status` - Check the bot's status, permissions, and configuration
+- `/lichess_status` - Check the bot's status, permissions, and configuration
 
 After setting up a logging channel with `/setup_logging_channel`, the bot will post:
 - Log messages based on the configured log level

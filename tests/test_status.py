@@ -30,24 +30,24 @@ async def test_status_command(bot, interaction, settings, save_settings):
     # Find status command
     status_command = None
     for command in bot.tree.walk_commands():
-        if command.name == "status":
+        if command.name == "lichess_status":
             status_command = command
             break
     
-    assert status_command is not None, "Status command not found"
+    assert status_command is not None, "lichess_status command not found"
     
-    # Call the status command
+    # Call the lichess_status command
     await status_command.callback(interaction)
     
     # Verify interactions
     interaction.response.defer.assert_called_once_with(ephemeral=True)
-    assert interaction.followup.send.called
-    
-    # Verify ephemeral is set for the error message
-    call_kwargs = interaction.followup.send.call_args.kwargs
-    assert call_kwargs.get("ephemeral") is True
-    
-    # At the very least, we got an error message
-    error_message = "⚠️ Error checking bot status. Please check logs."
-    if "content" in call_kwargs:
-        assert error_message in call_kwargs["content"]
+    interaction.followup.send.assert_called_once()
+
+    # Verify embed or error message was sent
+    args, kwargs = interaction.followup.send.call_args
+    assert kwargs.get("ephemeral") is True
+
+    # Verify embed or error message was sent correctly
+    if "embed" in kwargs:
+        embed = kwargs["embed"]
+        assert embed.title == "Bot Status"

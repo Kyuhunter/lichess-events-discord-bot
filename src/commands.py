@@ -564,9 +564,9 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                 logger.error(f"Error testing logging channel {channel.name} ({channel_id})", exc_info=e)
                 await interaction.followup.send(f"❌ Error testing channel: {str(e)}")
 
-    @bot.tree.command(name="status", description="Check bot status and health")
-    async def status(interaction: discord.Interaction):
-        """Check the status and health of the bot."""
+    @bot.tree.command(name="lichess_status", description="Check bot status and health of the Lichess Events Bot")
+    async def lichess_status(interaction: discord.Interaction):
+        """Check the status and health of the Lichess Events Discord Bot."""
         try:
             await interaction.response.defer(ephemeral=True)
             
@@ -578,8 +578,6 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             
             # Bot information
             bot_info = []
-            
-            # Handle test environment (bot.user might be None)
             if bot.user:
                 bot_info.extend([
                     f"Name: {bot.user.name}",
@@ -588,13 +586,11 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             else:
                 bot_info.append("Name: [Test Environment]")
             
-            # Add uptime if available
             if hasattr(bot, 'launch_time'):
                 uptime = datetime.now(timezone.utc) - datetime.fromtimestamp(bot.launch_time, timezone.utc)
                 bot_info.append(f"Uptime: {uptime}")
             else:
                 bot_info.append("Uptime: Unknown")
-                
             bot_info.append(f"Servers: {len(bot.guilds)}")
             
             embed.add_field(name="Bot Info", value="\n".join(bot_info), inline=False)
@@ -602,49 +598,44 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             # Guild-specific information
             gid = str(interaction.guild_id)
             guild_settings = SETTINGS.get(gid, {})
-            
-            # Team settings
             teams = guild_settings.get("teams", [])
             teams_info = "No teams registered" if not teams else "\n".join(teams)
             embed.add_field(name="Teams", value=teams_info, inline=True)
             
-            # Auto-sync status
             auto_sync = guild_settings.get("auto_sync", True)
             embed.add_field(name="Auto Sync", value="Enabled" if auto_sync else "Disabled", inline=True)
             
-            # Notification channel
-            notif_channel_id = guild_settings.get("notification_channel")
-            notif_channel = "Not configured"
-            if notif_channel_id:
-                channel = interaction.guild.get_channel(notif_channel_id)
-                notif_channel = f"#{channel.name}" if channel else f"Invalid channel ({notif_channel_id})"
-            embed.add_field(name="Notification Channel", value=notif_channel, inline=True)
+            notif_id = guild_settings.get("notification_channel")
+            notif = "Not configured"
+            if notif_id:
+                channel = interaction.guild.get_channel(notif_id)
+                notif = f"#{channel.name}" if channel else f"Invalid channel ({notif_id})"
+            embed.add_field(name="Notification Channel", value=notif, inline=True)
             
-            # Bot permissions check
+            # Permissions (best effort)
             if bot.user and interaction.guild:
-                bot_member = interaction.guild.get_member(bot.user.id)
-                if bot_member:
-                    perms = interaction.channel.permissions_for(bot_member)
-                    required_perms = {
-                        "Send Messages": perms.send_messages,
-                        "Embed Links": perms.embed_links,
-                        "Manage Events": perms.manage_events,
-                        "Read Message History": perms.read_message_history,
-                    }
-                    
-                    perm_status = "\n".join([f"{perm}: {'✅' if has else '❌'}" for perm, has in required_perms.items()])
-                    embed.add_field(name="Permissions", value=perm_status, inline=False)
+                member = interaction.guild.get_member(bot.user.id)
+                if member:
+                    perms = interaction.channel.permissions_for(member)
+                    perm_status = []
+                    for perm_name, has in [("Send Messages", perms.send_messages), ("Embed Links", perms.embed_links), ("Manage Events", perms.manage_events), ("Read Message History", perms.read_message_history)]:
+                        perm_status.append(f"{perm_name}: {'✅' if has else '❌'}")
+                    embed.add_field(name="Permissions", value="\n".join(perm_status), inline=False)
                 else:
                     embed.add_field(name="Permissions", value="Could not check permissions", inline=False)
             else:
-                # Fallback for test environment
                 embed.add_field(name="Permissions", value="Not available in test environment", inline=False)
             
             await interaction.followup.send(embed=embed, ephemeral=True)
-        
         except Exception as e:
             ensure_file_handler()
-            logger.error(f"Error in status command", exc_info=e)
+            logger.error("Error in lichess_status command", exc_info=e)
             await interaction.followup.send(
                 "⚠️ Error checking bot status. Please check logs.", ephemeral=True
             )
+
+    # Alias for backward compatibility
+    @bot.tree.command(name="status", description="Alias for /lichess_status")
+    async def status(interaction: discord.Interaction):
+        """Alias for lichess_status command."""
+        await lichess_status(interaction)
