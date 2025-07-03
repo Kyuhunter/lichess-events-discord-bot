@@ -1,6 +1,7 @@
 import os
 from discord.ext import tasks
-from sync import sync_events_for_guild
+from .sync import sync_events_for_guild
+
 
 def start_background_tasks(bot, SETTINGS):
     @tasks.loop(seconds=int(os.getenv("CHECK_INTERVAL", 300)))

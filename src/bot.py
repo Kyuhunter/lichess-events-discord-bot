@@ -3,13 +3,20 @@ import json
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
-from commands import setup_commands
-from tasks import start_background_tasks
+from .commands import setup_commands
+from .tasks import start_background_tasks
 
-load_dotenv()
+# Ensure config directory for .env
+CONFIG_DIR = "config"
+os.makedirs(CONFIG_DIR, exist_ok=True)
+load_dotenv(dotenv_path=os.path.join(CONFIG_DIR, ".env"))
 
 DISCORD_TOKEN = os.getenv("DISCORD_TOKEN")
-SETTINGS_FILE = "settings.json"
+# Ensure runtime files go under data/ only
+DATA_DIR = "data"
+os.makedirs(DATA_DIR, exist_ok=True)
+# settings stored in data/
+SETTINGS_FILE = os.path.join(DATA_DIR, "settings.json")
 
 intents = discord.Intents.default()
 intents.message_content = False  # Disable privileged intent if not needed
@@ -36,6 +43,5 @@ async def on_ready():
 # Setup commands
 setup_commands(bot, SETTINGS, save_settings)
 
-if __name__ == "__main__":
-    bot.run(DISCORD_TOKEN)
-
+# Run bot
+bot.run(DISCORD_TOKEN)

@@ -7,18 +7,27 @@ from datetime import datetime, timezone
 import json
 
 async def log_to_notification_channel(guild: discord.Guild, SETTINGS: dict, message: str):
-    guild_id = str(guild.id)
-    channel_id = SETTINGS.get(guild_id, {}).get("notification_channel")
-    if channel_id:
-        channel = guild.get_channel(channel_id)
-        if channel:
-            await channel.send(message)
+    gid = str(guild.id)
+    chan_id = SETTINGS.get(gid, {}).get("notification_channel")
+    if not chan_id:
+        return
+    channel = guild.get_channel(chan_id)
+    if not isinstance(channel, discord.TextChannel):
+        return
+    perms = channel.permissions_for(guild.me or
+                                     guild.get_member(commands.Bot.user.id))
+    if not perms.send_messages:
+        return
+    try:
+        await channel.send(message)
+    except discord.Forbidden:
+        print(f"[{guild.name}] 🚫 Forbidden sending to channel {chan_id}")
 
 async def sync_events_for_guild(
     guild: discord.Guild, SETTINGS: dict, bot: commands.Bot, verbose: bool = False
 ) -> Tuple[int, list[str]]:
     gid = str(guild.id)
-    team = SETTINGS.get(gid, {}).get("team")  # Ensure team is fetched from the dictionary
+    team = SETTINGS.get(gid, {}).get("team")
     if not team:
         if verbose:
             print(f"[{guild.name}] No team registered, skipping.")
@@ -27,14 +36,16 @@ async def sync_events_for_guild(
     # Check permissions
     me = guild.me or guild.get_member(bot.user.id)
     if not me or not me.guild_permissions.manage_events:
-        print(f"[{guild.name}] ❌ Missing permission: Manage Events")
+        if verbose:
+            print(f"[{guild.name}] ❌ Missing permission: Manage Events")
         return 0, []
 
     # Fetch existing events
     try:
         existing_events = await guild.fetch_scheduled_events()
     except discord.Forbidden:
-        print(f"[{guild.name}] ❌ Forbidden when fetching existing events.")
+        if verbose:
+            print(f"[{guild.name}] ❌ Forbidden when fetching existing events.")
         return 0, []
     existing_map = {ev.location: ev for ev in existing_events if ev.location}
 
@@ -49,10 +60,10 @@ async def sync_events_for_guild(
     async with aiohttp.ClientSession() as session:
         async with session.get(url) as resp:
             if resp.status != 200:
-                print(f"[{guild.name}] ⚠️ Lichess API returned HTTP {resp.status}")
+                if verbose:
+                    print(f"[{guild.name}] ⚠️ Lichess API returned HTTP {resp.status}")
                 return created, created_events
 
-            # Read line by line with timeout
             while True:
                 try:
                     line = await asyncio.wait_for(resp.content.readline(), timeout=1.0)
@@ -84,12 +95,10 @@ async def sync_events_for_guild(
                         print(f"[{guild.name}] Tournament {t.get('id')} already started, skipping.")
                     continue
 
-                # Convert times (must happen before update logic)
                 start_time = datetime.fromtimestamp(starts_at / 1000, tz=timezone.utc)
                 finishes_at = t.get("finishesAt", starts_at + 60 * 60 * 1000)
                 end_time = datetime.fromtimestamp(finishes_at / 1000, tz=timezone.utc)
 
-                # Build URL and check for duplicates
                 url_tourney = f"https://lichess.org/tournament/{t['id']}"
                 name = t.get("fullName", f"Arena {t['id']}")
                 desc = (
@@ -99,7 +108,6 @@ async def sync_events_for_guild(
                     f"{url_tourney}"
                 )
 
-                # if already exists by URL, update its details
                 if ev := existing_map.get(url_tourney):
                     if (
                         ev.name != name
@@ -126,7 +134,6 @@ async def sync_events_for_guild(
                             print(f"[{guild.name}] ⚠️ Error updating {url_tourney}: {e}")
                     continue
 
-                # Create event
                 try:
                     await guild.create_scheduled_event(
                         name=name,
@@ -139,18 +146,19 @@ async def sync_events_for_guild(
                     )
                     created += 1
                     created_events.append(url_tourney)
-                    print(f"[{guild.name}] 📅 New event created: {t.get('fullName')} ({t['id']})")
+                    if verbose:
+                        print(f"[{guild.name}] 📅 New event created: {name} ({t['id']})")
                 except discord.Forbidden:
-                    print(f"[{guild.name}] ❌ Forbidden when creating {url_tourney}")
+                    if verbose:
+                        print(f"[{guild.name}] ❌ Forbidden when creating {url_tourney}")
                     return created, created_events
                 except Exception as e:
                     print(f"[{guild.name}] ⚠️ Error when creating {url_tourney}: {e}")
                     continue
 
     if created > 0:
-        event_list = "\n".join(created_events)
         await log_to_notification_channel(
-            guild, SETTINGS, f"✅ Sync completed: {created} new events created:\n{event_list}"
+            guild, SETTINGS, f"✅ Sync completed: {created} new events created:\n" + "\n".join(created_events)
         )
 
     if verbose:
