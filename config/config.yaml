@@ -2,7 +2,7 @@
 
 logging:
   # Global logging level: DEBUG, INFO, WARNING, ERROR, CRITICAL
-  level: INFO
+  level: ERROR
   # When set to true, enables DEBUG-level logging globally
   verbose: false
   # File handler settings
