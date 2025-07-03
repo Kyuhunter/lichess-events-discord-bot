@@ -46,3 +46,29 @@ Start the bot using the package entrypoint:
 ```bash
 python -m src.bot
 ```
+
+## Configuration
+
+A `config/config.yaml` file lets you control the bot’s logging and scheduling behavior without touching code.
+
+```yaml
+logging:
+  level: INFO            # Global log level: DEBUG, INFO, WARNING, ERROR, CRITICAL
+  verbose: false         # If true, enables DEBUG-level logging globally
+  file:
+    filename_pattern: "error_log_%Y_%m_%d.log"  # Daily error log filename pattern
+    level: ERROR         # Log level written to the file handler
+  console:
+    level: INFO          # Log level printed to the console
+
+scheduler:
+  auto_sync: true        # Enable or disable background sync (default true)
+  cron: "0 3 * * *"     # Cron schedule (crontab format) for running sync jobs
+```
+
+- `logging.level` sets the overall verbosity of log messages.
+- `logging.verbose` toggles detailed debug output.
+- `logging.file.filename_pattern` and `logging.file.level` configure file-based error logging.
+- `logging.console.level` configures on-screen log output.
+- `scheduler.auto_sync` is the default for new guilds; individual guilds can override it with the `/auto_sync` command.
+- `scheduler.cron` follows standard cron syntax. For example, `0 3 * * *` runs daily at 3 AM.
