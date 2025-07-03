@@ -25,11 +25,12 @@ git clone https://github.com/your-repo/lichess-events-discord-bot.git
 cd lichess-events-discord-bot
 ```
 
-### 2. Create a .env File
-Rename the .env.sample to .env and fill in your Application Token
+### 2. Create a config/.env File
+Rename `config/.env.sample` to `config/.env` and add your Discord token:
 ```bash
-mv .sample.env .env
-nano .env
+mkdir -p config
+mv config/.env.sample config/.env
+nano config/.env
 ```
 
 ### 3. Setup the Python environment
@@ -40,7 +41,7 @@ pip install python-dotenv discord.py
 ```
 
 ### 4. Run the Bot
-Start the bot using:
+Start the bot using the package entrypoint:
 ```bash
-python bot.py
+python -m src.bot
 ```
