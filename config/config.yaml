@@ -27,3 +27,13 @@ scheduler:
    auto_sync: true
    # Cron expression for scheduled sync (crontab format)
    cron: "0 3 * * *"
+
+performance:
+   # Cache settings for Lichess API responses
+   cache:
+     # How long to cache tournament data (in minutes)
+     ttl_minutes: 15
+   # Rate limiting and batching
+   batch_size: 5
+   # Delay between batches to avoid rate limits (in seconds)
+   batch_delay: 1

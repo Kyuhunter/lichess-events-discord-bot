@@ -165,6 +165,12 @@ logging:
 scheduler:
   auto_sync: true        # Enable or disable background sync (default true)
   cron: "0 3 * * *"     # Cron schedule (crontab format) for running sync jobs
+
+performance:
+  cache:
+    ttl_minutes: 15      # How long to cache tournament data (in minutes)
+  batch_size: 5          # Number of items to process in each batch
+  batch_delay: 1         # Delay between batches in seconds
 ```
 
 Configuration options explained:
@@ -184,6 +190,33 @@ Configuration options explained:
       - `*/30 * * * *` - Every 30 minutes
       - `0 */2 * * *` - Every 2 hours
       - `0 12,18 * * *` - At 12 PM and 6 PM daily
+
+- **Performance Settings**
+  - `performance.cache.ttl_minutes`: How long to keep tournament data in memory cache (15 minutes by default)
+  - `performance.batch_size`: Number of API operations to perform in a batch before pausing
+  - `performance.batch_delay`: Delay in seconds between processing batches
+
+## Performance Optimization
+
+The bot includes several optimizations to reduce API calls and improve performance:
+
+### Caching
+
+- Tournament data is cached for 15 minutes (configurable via `performance.cache.ttl_minutes`)
+- This significantly reduces the number of API calls made to Lichess during frequent syncs
+- Cache is automatically invalidated when teams are removed
+
+### Batch Processing
+
+- Events are processed in batches to avoid hitting rate limits
+- Background sync pre-fetches all guild events in one operation instead of separate calls
+- Configurable batch size and delay between batches
+
+### Efficient Synchronization
+
+- Only upcoming tournaments are synced (past tournaments are skipped)
+- Events are compared with existing ones before making update API calls
+- Update operations are skipped if no actual changes are detected
 
 ## Quick Setup
 

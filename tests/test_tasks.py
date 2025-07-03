@@ -26,7 +26,7 @@ def dummy_scheduler(monkeypatch):
 async def test_start_background_tasks(monkeypatch, dummy_scheduler):
     # Stub sync_events_for_guild to record calls
     call_log = []
-    async def fake_sync(guild, SETTINGS, bot, verbose=False):
+    async def fake_sync(guild, SETTINGS, bot, verbose=False, prefetched_events=None):
         call_log.append((guild.id, SETTINGS.get(str(guild.id), None)))
     monkeypatch.setattr(tasks_mod, 'sync_events_for_guild', fake_sync)
 

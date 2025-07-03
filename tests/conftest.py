@@ -48,3 +48,12 @@ def save_settings():
         calls.append(True)
     _save.was_called = calls
     return _save
+
+@pytest.fixture(autouse=True)
+def clear_cache():
+    """Clear the cache before each test to avoid interference between tests."""
+    try:
+        from src.cache import cache
+        cache.invalidate_all()
+    except (ImportError, AttributeError):
+        pass  # Cache module might not be available in some tests

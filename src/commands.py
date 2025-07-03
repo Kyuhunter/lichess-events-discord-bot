@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from discord.ext import commands
 from .sync import sync_events_for_guild
 from .utils import ensure_file_handler, logger
+from .cache import cache
 
 # For detecting if we're in a test environment
 try:
@@ -92,26 +93,42 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             save_settings()
             # Identify and delete only this team's upcoming tournament events
             deleted = 0
-            async with aiohttp.ClientSession() as session:
-                url = f"https://lichess.org/api/team/{slug}/arena"
-                async with session.get(url) as resp:
-                    if resp.status == 200:
-                        tourney_ids = []
-                        async for line in resp.content:
-                            try:
-                                t = json.loads(line.decode().strip())
-                                tourney_ids.append(t.get('id'))
-                            except Exception:
-                                continue
-                        urls_to_delete = {f"https://lichess.org/tournament/{tid}" for tid in tourney_ids}
-                        events = await interaction.guild.fetch_scheduled_events()
-                        for ev in events:
-                            if ev.location in urls_to_delete:
+            from .cache import cache
+            
+            # Try getting from cache first
+            cached_tournaments = cache.get_tournaments(slug)
+            
+            if cached_tournaments:
+                # Use cached tournament data
+                tourney_ids = [t.get('id') for t in cached_tournaments if t.get('id')]
+            else:
+                # If not in cache, make an API call
+                tourney_ids = []
+                async with aiohttp.ClientSession() as session:
+                    url = f"https://lichess.org/api/team/{slug}/arena"
+                    async with session.get(url) as resp:
+                        if resp.status == 200:
+                            async for line in resp.content:
                                 try:
-                                    await ev.delete()
-                                    deleted += 1
+                                    t = json.loads(line.decode().strip())
+                                    tourney_ids.append(t.get('id'))
                                 except Exception:
-                                    pass
+                                    continue
+            
+            # Invalidate cache for this team since it's being removed
+            cache.invalidate(slug)
+            
+            # Delete associated events
+            if tourney_ids:
+                urls_to_delete = {f"https://lichess.org/tournament/{tid}" for tid in tourney_ids}
+                events = await interaction.guild.fetch_scheduled_events()
+                for ev in events:
+                    if ev.location in urls_to_delete:
+                        try:
+                            await ev.delete()
+                            deleted += 1
+                        except Exception:
+                            pass
             # Send deletion summary
             await interaction.followup.send(
                 f"🗑️ Team `{slug}` removed. Deleted {deleted} associated event(s).", ephemeral=True
