@@ -2,6 +2,7 @@ import os
 import discord
 from discord.ext import commands
 from .sync import sync_events_for_guild
+from .utils import ensure_file_handler, logger
 
 
 def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
@@ -39,13 +40,18 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
     @bot.tree.command(name="remove_team", description="Remove a registered Lichess team")
     @discord.app_commands.describe(team="Registered team slug to remove")
     async def remove_team(interaction: discord.Interaction, team: str):
-        # Defer response to allow time for deleting events
-        await interaction.response.defer(ephemeral=True)
-
+        """Remove a team, delete its events, and log errors to file if they occur."""
         gid = str(interaction.guild_id)
         teams = SETTINGS.get(gid, {}).get("teams", [])
         slug = team.strip()
-        if slug in teams:
+        if slug not in teams:
+            await interaction.response.send_message(
+                f"⚠️ Team `{slug}` is not registered.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        try:
+            # Remove team from settings
             teams.remove(slug)
             save_settings()
             # Identify and delete only this team's upcoming tournament events
@@ -55,7 +61,6 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                 url = f"https://lichess.org/api/team/{slug}/arena"
                 async with session.get(url) as resp:
                     if resp.status == 200:
-                        # collect tournament IDs
                         tourney_ids = []
                         async for line in resp.content:
                             try:
@@ -64,9 +69,8 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
                             except Exception:
                                 continue
                         urls_to_delete = {f"https://lichess.org/tournament/{tid}" for tid in tourney_ids}
-                        # fetch and delete matching events
-                        existing = await interaction.guild.fetch_scheduled_events()
-                        for ev in existing:
+                        events = await interaction.guild.fetch_scheduled_events()
+                        for ev in events:
                             if ev.location in urls_to_delete:
                                 try:
                                     await ev.delete()
@@ -80,10 +84,12 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             await log_to_notification_channel(
                 interaction.guild, f"Team `{slug}` removed and {deleted} events deleted."
             )
-        else:
-            # Immediate followup for non-registered slug
-            await interaction.response.send_message(
-                f"⚠️ Team `{slug}` is not registered.", ephemeral=True
+        except Exception as e:
+            # Log error to file and inform user
+            ensure_file_handler()
+            logger.error(f"Failed to remove team {slug}", exc_info=e)
+            await interaction.followup.send(
+                f"❌ Failed to remove team `{slug}` due to an internal error.", ephemeral=True
             )
 
     @bot.tree.command(name="list_teams", description="List registered Lichess teams in this guild")
