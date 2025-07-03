@@ -1,5 +1,6 @@
 import os
 import discord
+import aiohttp, json
 from discord.ext import commands
 from .sync import sync_events_for_guild
 from .utils import ensure_file_handler, logger
@@ -56,7 +57,6 @@ def setup_commands(bot: commands.Bot, SETTINGS: dict, save_settings: callable):
             save_settings()
             # Identify and delete only this team's upcoming tournament events
             deleted = 0
-            import aiohttp, json
             async with aiohttp.ClientSession() as session:
                 url = f"https://lichess.org/api/team/{slug}/arena"
                 async with session.get(url) as resp:

@@ -1,5 +1,29 @@
+# Environment
+config/.env
 .env
+
+# Virtual environment
 venv/
+
+# Python cache
 __pycache__/
-settings.json
+*.py[cod]
+*$py.class
+
+# Bot runtime data and settings
 data/
+settings.json
+
+# Scheduler logs and archives
+data/log/
+*.log
+
+# Test and coverage reports
+htmlcov/
+.coverage
+coverage.xml
+.pytest_cache/
+
+# Distribution/build artifacts
+dist/
+build/

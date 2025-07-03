@@ -49,7 +49,7 @@ python -m src.bot
 
 ## Configuration
 
-A `config/config.yaml` file lets you control the bot’s logging and scheduling behavior without touching code.
+A `config/config.yaml` file lets you control the bot's logging and scheduling behavior without touching code.
 
 ```yaml
 logging:
@@ -72,3 +72,44 @@ scheduler:
 - `logging.console.level` configures on-screen log output.
 - `scheduler.auto_sync` is the default for new guilds; individual guilds can override it with the `/auto_sync` command.
 - `scheduler.cron` follows standard cron syntax. For example, `0 3 * * *` runs daily at 3 AM.
+
+## Testing
+
+The project includes a comprehensive test suite with >80% test coverage. Tests are organized by module and functionality:
+
+### Test Structure
+
+- `tests/test_commands.py` & `tests/test_commands_more.py`: Tests for all Discord commands, user interactions, and response handling
+- `tests/test_sync.py`, `tests/test_sync_flow.py`, `tests/test_sync_additional.py`, `tests/test_sync_extra.py`, `tests/test_sync_more.py`: Tests for Lichess tournament synchronization logic
+- `tests/test_tasks.py`: Tests for scheduled background tasks and error handling
+- `tests/test_utils.py`: Tests for configuration and logging utilities
+- `tests/conftest.py`: Shared test fixtures and mocks
+
+### Running Tests
+
+Install test dependencies:
+```bash
+pip install pytest pytest-asyncio pytest-cov
+```
+
+Run the full test suite:
+```bash
+python -m pytest
+```
+
+Generate coverage report:
+```bash
+python -m pytest --cov=src --cov-report=html
+```
+
+This will create a coverage report in the `htmlcov/` directory that you can view in a browser.
+
+### VS Code Integration
+
+The project includes a VS Code task for running tests directly from the editor:
+
+1. Open the Command Palette (`Ctrl+Shift+P`)
+2. Type "Tasks: Run Task"
+3. Select "Run Tests"
+
+This will execute the test suite using the virtual environment's Python interpreter.

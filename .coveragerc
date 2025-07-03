@@ -1,0 +1,4 @@
+[run]
+omit =
+    src/bot.py
+#    src/sync.py  # included in tests now
